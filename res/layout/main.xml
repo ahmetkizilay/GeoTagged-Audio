@@ -7,9 +7,9 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:apiKey="your key here"
+        android:apiKey="your api key here"
         android:clickable="true"
-        android:enabled="true" />
+        android:state_enabled="true" />
 
     <SeekBar
         android:id="@+id/seekBar1"
