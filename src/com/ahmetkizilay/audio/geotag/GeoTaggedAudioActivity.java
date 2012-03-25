@@ -192,7 +192,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 			
 			// acquireWakeLock();
 			
-		    Thread.setDefaultUncaughtExceptionHandler(new CustomUncaughtExceptionHandler());
+		    // Thread.setDefaultUncaughtExceptionHandler(new CustomUncaughtExceptionHandler());
 
 		} catch (Exception ex) {
 			errorMessage = "Create: " + ex.getMessage();
