@@ -7,7 +7,7 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:apiKey="0eRAjni5AmYoC15mKCT0QQNqB2HvAv6KREQCuPg"
+        android:apiKey="your key here"
         android:clickable="true"
         android:enabled="true" />
 
