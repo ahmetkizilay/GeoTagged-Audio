@@ -21,6 +21,10 @@ public class RouteOverlay extends Overlay{
 		this.coordinates = coordinates;
 	}
 	
+	public void clearCoordinates() {
+		this.coordinates.clear();
+	}
+	
 	public void draw(Canvas canvas, MapView mapView, boolean shadow) {
 		super.draw(canvas, mapView, shadow);
 		
