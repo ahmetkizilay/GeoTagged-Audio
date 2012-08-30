@@ -3,8 +3,10 @@ package com.ahmetkizilay.audio.geotag;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
@@ -14,6 +16,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import com.ahmetkizilay.audio.geotag.settings.MediaRecorderSettings;
+import com.ahmetkizilay.audio.geotag.settings.MediaRecorderSettingsActivity;
+import com.ahmetkizilay.audio.geotag.upload.SCUploadActivity;
 import com.google.android.maps.GeoPoint;
 import com.google.android.maps.MapActivity;
 import com.google.android.maps.MapController;
@@ -27,6 +32,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -53,6 +59,17 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 
 public class GeoTaggedAudioActivity extends MapActivity {
 
+	private static final int OPEN_FILE_DIALOG = 2;
+	private static final int LOCATION_SETTINGS_DIALOG = 3;
+	private static final int ABOUT_PAGE_DIALOG = 4;
+	private static final int ERROR_DIALOG = 5;
+	private static final int EXPORT_FILE_DIALOG = 6;
+	private static final int SAVE_FILE_DIALOG = 10;
+	private static final int MEDIA_RECORDER_SETTINGS_INTENT_RESULT = 11;
+	private static final int IMPORT_INTENT_RESULT = 12;	
+	private static final int UPLOAD_INTENT_RESULT = 13;
+	private static final String MEDIA_RECORDER_SETTINGS_FILE_NAME = "audrecset_file";
+	
 	private String home_directory_string;
 	private String tempSoundFile;
 	private String tempLocationFile;
@@ -64,6 +81,8 @@ public class GeoTaggedAudioActivity extends MapActivity {
 
 	private MediaPlayer mediaPlayer;
 	private MediaRecorder mediaRecorder;
+	
+	private MediaRecorderSettings mediaRecorderSettings;
 
 	private long recordStartTime;
 	
@@ -163,7 +182,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 			btnOpen.setOnClickListener(new OnClickListener() {
 
 				public void onClick(View v) {
-					showDialog(2);
+					showDialog(OPEN_FILE_DIALOG);
 				}
 			});
 			
@@ -188,6 +207,8 @@ public class GeoTaggedAudioActivity extends MapActivity {
 				}
 			});
 
+
+			setupMediaRecorderSettings();
 			setupLocationServices();
 			
 			// acquireWakeLock();
@@ -196,7 +217,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 
 		} catch (Exception ex) {
 			errorMessage = "Create: " + ex.getMessage();
-			showDialog(5);
+			showDialog(ERROR_DIALOG);
 		}
 	}
 	
@@ -225,7 +246,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 	private void stopRecording() {
 		isRecording = false;
 		saveFile(tempLocationFile, tempLocationBuffer);
-		showDialog(10);
+		showDialog(SAVE_FILE_DIALOG);
 		
 		releaseWakeLock();
 		
@@ -278,7 +299,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 
 		} catch (Exception exp) {
 			errorMessage = "Play Click: " + exp.getMessage();
-			showDialog(5);
+			showDialog(ERROR_DIALOG);
 		} 
 	}
 
@@ -311,7 +332,6 @@ public class GeoTaggedAudioActivity extends MapActivity {
 						if(!mapView.getOverlays().contains(markerOverlay))
 							mapView.getOverlays().add(markerOverlay);
 						
-
 						mapView.postInvalidate();
 					} catch (Exception exp) {
 						errorCount++;
@@ -331,6 +351,14 @@ public class GeoTaggedAudioActivity extends MapActivity {
 	private void btnRecordOnClick() {
 		try {
 
+			if (routeOverlay != null) {
+				mapView.getOverlays().remove(routeOverlay);
+				routeOverlay.clearCoordinates();
+				routeOverlay = null;
+				
+				mapView.invalidate();
+			}
+			
 			acquireWakeLock();
 			
 			long currentTime = System.currentTimeMillis();
@@ -344,9 +372,36 @@ public class GeoTaggedAudioActivity extends MapActivity {
 			}
 			mediaRecorder = new MediaRecorder();
 			mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-			mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 			mediaRecorder.setOutputFile(tempSoundFile);
-			mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+			mediaRecorder.setMaxDuration(0);
+			
+			if(mediaRecorderSettings.isOutputTypeSet()) {
+				mediaRecorder.setOutputFormat(mediaRecorderSettings.getOutputType());
+			}
+			else {
+				mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+			}
+			
+			if(mediaRecorderSettings.isAudioEncoderSet()) {
+				mediaRecorder.setAudioEncoder(mediaRecorderSettings.getAudioEncoder());
+			}
+			else {
+				mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+			}
+			
+			if(mediaRecorderSettings.isSamplingRateSet()) {
+				mediaRecorder.setAudioSamplingRate(mediaRecorderSettings.getSamplinRate());
+			}
+			else {
+				mediaRecorder.setAudioSamplingRate(44100);
+			}
+			
+			if(mediaRecorderSettings.isBitRateSet()) {
+				mediaRecorder.setAudioEncodingBitRate(mediaRecorderSettings.getBitRate());
+			}
+			else {
+				mediaRecorder.setAudioEncodingBitRate(16);
+			}
 
 			mediaRecorder.prepare();
 			mediaRecorder.start();
@@ -357,7 +412,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		} catch (Exception exp) {
 			isRecording = false;
 			errorMessage = "Error with startRecording " + exp.getMessage();
-			showDialog(5);
+			showDialog(ERROR_DIALOG);
 		}
 
 	}
@@ -373,8 +428,8 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		btnOpen.setEnabled(true);
 
 		if (mediaPlayer != null) {
-			mediaPlayer.reset();
 			mediaPlayer.stop();
+			mediaPlayer.reset();
 			mediaPlayer.release();
 			mediaPlayer = null;
 		}
@@ -422,17 +477,17 @@ public class GeoTaggedAudioActivity extends MapActivity {
 	@Override
 	protected Dialog onCreateDialog(int id) {
 		switch (id) {
-		case 10:
+		case SAVE_FILE_DIALOG:
 			return createSaveFileDialog();
-		case 2:
+		case OPEN_FILE_DIALOG:
 			return createOpenFileDialog();
-		case 3:
+		case LOCATION_SETTINGS_DIALOG:
 			return createLocationSettingsDialog();
-		case 4:
+		case ABOUT_PAGE_DIALOG:
 			return createAboutDialog();
-		case 5:
+		case ERROR_DIALOG:
 			return createErrorDialog();
-		case 6: 
+		case EXPORT_FILE_DIALOG: 
 			return createExportFileDialog();
 		default:
 			return null;
@@ -493,7 +548,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		
 		builder.setOnCancelListener(new OnCancelListener() {			
 			public void onCancel(DialogInterface dialog) {
-				removeDialog(6);
+				removeDialog(EXPORT_FILE_DIALOG);
 			}
 		});
 		builder.setItems(fileNames, new DialogInterface.OnClickListener() {
@@ -597,7 +652,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		
 		builder.setOnCancelListener(new OnCancelListener() {			
 			public void onCancel(DialogInterface dialog) {
-				removeDialog(2);
+				removeDialog(OPEN_FILE_DIALOG);
 			}
 		});
 		builder.setItems(fileNames, new DialogInterface.OnClickListener() {
@@ -609,6 +664,7 @@ public class GeoTaggedAudioActivity extends MapActivity {
 				prepareRouteOverlay();
 				
 				btnPlay.setEnabled(true);
+				removeDialog(OPEN_FILE_DIALOG);
 			}
 		});
 		return builder.create();
@@ -637,6 +693,19 @@ public class GeoTaggedAudioActivity extends MapActivity {
 
 			}
 		});
+		alert.setButton(Dialog.BUTTON_NEGATIVE, "Cancel", new DialogInterface.OnClickListener() {
+			
+			public void onClick(DialogInterface dialog, int which) {
+				new File(tempSoundFile).delete();
+				new File(tempLocationFile).delete();
+				
+				EditText editText = (EditText) alert.findViewById(R.id.new_file_name);
+				editText.setText("");
+				
+				btnPlay.setEnabled(false);
+			}
+		});
+		alert.setCancelable(false);
 
 		return alert;
 	}
@@ -651,6 +720,32 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		}
 	}
 
+	private void setupMediaRecorderSettings() {
+		mediaRecorderSettings = new MediaRecorderSettings();
+		try {
+    		    		
+    		FileInputStream fis = openFileInput(MEDIA_RECORDER_SETTINGS_FILE_NAME);
+    		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    		byte[] buffer = new byte[512];
+    		int bytes_read;
+    		while((bytes_read = fis.read(buffer)) != -1) {
+    			baos.write(buffer, 0, bytes_read);
+    		}
+    		
+    		String data = new String(baos.toByteArray());
+    		String[] pieces = data.split("#");
+    		mediaRecorderSettings.setOutputType(Integer.parseInt(pieces[0]));
+    		mediaRecorderSettings.setSamplingRate(Integer.parseInt(pieces[1]));
+    		mediaRecorderSettings.setBitRate(Integer.parseInt(pieces[2]));
+    		mediaRecorderSettings.setAudioEncoder(Integer.parseInt(pieces[3]));    		
+    	}
+    	catch(FileNotFoundException fnfe) {}
+    	catch(Exception exp) {
+			errorMessage = "Error Retrieving Audio Settings";
+			showDialog(ERROR_DIALOG);
+    	}
+	}
+	
 	private void setupLocationServices() {
 		locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 		locationListener = new LocationListener() {
@@ -671,30 +766,30 @@ public class GeoTaggedAudioActivity extends MapActivity {
 
 				if (!isPlaying) {
 					currentPoint = new GeoPoint((int) (latitude * 1E6), (int) (longitude * 1E6));
-
-					mapController.setCenter(currentPoint);
-
 					if (isRecording) {
 						tempLocationBuffer += currentPoint.getLatitudeE6() + " " + currentPoint.getLongitudeE6() + " " + (System.currentTimeMillis() - recordStartTime) + "\n";
 					}
-
-					mapView.getOverlays().remove(markerOverlay);
-					markerOverlay.clearOverlays();
-					OverlayItem overlayItem = new OverlayItem(currentPoint, "You are here", "You are here");
-					markerOverlay.addOverlay(overlayItem);
-					mapView.getOverlays().add(markerOverlay);
 					
-					mapView.invalidate();
+					if(routeOverlay == null) {
+						mapController.setCenter(currentPoint);
+						mapView.getOverlays().remove(markerOverlay);
+						markerOverlay.clearOverlays();
+						OverlayItem overlayItem = new OverlayItem(currentPoint, "You are here", "You are here");
+						markerOverlay.addOverlay(overlayItem);
+						mapView.getOverlays().add(markerOverlay);
+						
+						mapView.invalidate();
+					}
 				}
 			}
 		};
 
 		if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 5.0f, locationListener);
+			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 2.0f, locationListener);
 		} else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-			locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 5.0f, locationListener);
+			locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 2.0f, locationListener);
 		} else {
-			showDialog(3);
+			showDialog(LOCATION_SETTINGS_DIALOG);
 		}		
 	}
 
@@ -709,24 +804,58 @@ public class GeoTaggedAudioActivity extends MapActivity {
 	public boolean onOptionsItemSelected(MenuItem item) {
 		switch (item.getItemId()) {
 		case R.id.about_page:
-			showDialog(4);
+			showDialog(ABOUT_PAGE_DIALOG);
 			return true;
 		case R.id.import_page:
 			handleImportAction();
 			return true;
 		case R.id.export_page:
-			showDialog(6);
+			showDialog(EXPORT_FILE_DIALOG);
+			return true;
+		case R.id.scupload_page:
+			callSCUploadIntent();
+			return true;
+		case R.id.audiosettings_page:
+			callAudioSettingsIntent();
 			return true;
 		default:
 			return super.onOptionsItemSelected(item);
 		}
 	}
 	
+	private void callSCUploadIntent() {
+		try {
+    		Intent uploadIntent = new Intent(this, SCUploadActivity.class);
+    		uploadIntent.setAction("com.ahmetkizilay.audio.geotag.upload.SCUpload");
+    		startActivityForResult(uploadIntent, UPLOAD_INTENT_RESULT);
+    	}
+    	catch(Exception exp) {
+    		Toast.makeText(this, "Error calling the upload intent", Toast.LENGTH_SHORT).show();
+    	}
+	}
+	
+    private void callAudioSettingsIntent() {
+    	try {
+    		Intent audioSettingsIntent = new Intent(this, MediaRecorderSettingsActivity.class);
+    		audioSettingsIntent.setAction("com.ahmetkizilay.audio.geotag.settings.MediaRecorderSettings");
+    		//audioSettingsIntent.setClass("com.ahmetkizilay.audio.geotag.settings", MediaRecorderSettingsActivity.class);
+    		audioSettingsIntent.putExtra("selectedOutputType", mediaRecorderSettings.getOutputType());
+    		audioSettingsIntent.putExtra("selectedSamplingRate", mediaRecorderSettings.getSamplinRate());
+    		audioSettingsIntent.putExtra("selectedBitRate", mediaRecorderSettings.getBitRate());
+    		audioSettingsIntent.putExtra("selectedAudioEncoder", mediaRecorderSettings.getAudioEncoder());
+    		
+    		startActivityForResult(audioSettingsIntent, MEDIA_RECORDER_SETTINGS_INTENT_RESULT);
+    	}
+    	catch(Exception exp) {
+    		Toast.makeText(this, "Error calling the intent", Toast.LENGTH_SHORT).show();
+    	}
+    }
+	
 	private void handleImportAction() {
 		try {
 			Intent intent = new Intent(this, ImportFileActivity.class);
 			intent.setAction("com.ahmetkizilay.audio.geotag.IMPORT_FILE");
-			startActivityForResult(intent, 0);
+			startActivityForResult(intent, IMPORT_INTENT_RESULT);
 		} catch(Throwable t) {
 			t.printStackTrace();
 		}
@@ -737,12 +866,52 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		super.onActivityResult(requestCode, resultCode, data);
 		
 		if(resultCode == Activity.RESULT_OK) {
-			if(requestCode == 0) {	
+			switch(requestCode) {
+			case MEDIA_RECORDER_SETTINGS_INTENT_RESULT:
+				updateMediaRecorderSettings(data);
+				break;
+			case IMPORT_INTENT_RESULT:
 				handleImportResultAction(data);
+			case UPLOAD_INTENT_RESULT:
+				handleUploadResultAction(data);
 			}
 		}
 	}
+	
+	private void handleUploadResultAction(Intent data) {
 		
+	}
+		
+    private void updateMediaRecorderSettings(Intent intent) {
+    	
+		int selectedOutputType = Integer.parseInt(intent.getExtras().get("selectedOutputType").toString());
+		int selectedSamplingRate = Integer.parseInt(intent.getExtras().get("selectedSamplingRate").toString());
+		int selectedBitRate = Integer.parseInt(intent.getExtras().get("selectedBitRate").toString());
+		int selectedAudioEncoder = Integer.parseInt(intent.getExtras().get("selectedAudioEncoder").toString());
+
+		mediaRecorderSettings.setOutputType(selectedOutputType);
+		mediaRecorderSettings.setSamplingRate(selectedSamplingRate);
+		mediaRecorderSettings.setBitRate(selectedBitRate);
+		mediaRecorderSettings.setAudioEncoder(selectedAudioEncoder);
+		
+		UpdateMediaRecorderSettingsInternalStorage();		
+    }
+    
+    private void UpdateMediaRecorderSettingsInternalStorage() {
+    	try {
+    		String data = mediaRecorderSettings.getOutputType() + "#" + 
+    				      mediaRecorderSettings.getSamplinRate() + "#" +
+    				      mediaRecorderSettings.getBitRate() + "#" +
+    				      mediaRecorderSettings.getAudioEncoder();
+    		FileOutputStream fos = openFileOutput(MEDIA_RECORDER_SETTINGS_FILE_NAME, Context.MODE_PRIVATE);
+    		fos.write(data.getBytes());
+    		fos.close();
+    	}
+    	catch(Exception exp) {
+    		Toast.makeText(this, "Could Not Update RecorderSettings File", Toast.LENGTH_SHORT).show();
+    	}
+    }
+
 	private void handleImportResultAction(Intent data) {
 		ZipInputStream zis = null;
 		BufferedOutputStream bos = null;
@@ -803,13 +972,20 @@ public class GeoTaggedAudioActivity extends MapActivity {
 	
 	private Dialog createAboutDialog() {
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setMessage("Geo-Tagged Audio\nVersion 1.1\n\nPERISONiC Sound And Media").setCancelable(false).setNeutralButton("OK", new DialogInterface.OnClickListener() {
+		builder.setMessage("Version 1.2\n\nPERISONiC Sound And Media").setCancelable(false).setNeutralButton("Close", new DialogInterface.OnClickListener() {
 			
 			public void onClick(DialogInterface dialog, int which) {
 				dialog.dismiss();
 				
 			}
-		});
+		}).setPositiveButton("Follow Me", new DialogInterface.OnClickListener() {
+			
+			public void onClick(DialogInterface dialog, int which) {
+				Intent twitterIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://mobile.twitter.com/ahmetkizilay"));				
+				startActivity(twitterIntent);				
+			}
+		}).setTitle("Geo-Tagged Audio").setIcon(R.drawable.geotagged_audio);
+		
 		return builder.create();
 	}
 	
@@ -836,6 +1012,11 @@ public class GeoTaggedAudioActivity extends MapActivity {
 		if(wakeLock != null && wakeLock.isHeld()) {
 			wakeLock.release();
 		}
+	}
+	
+	@Override
+	public void onConfigurationChanged(Configuration newConfig) {
+	    super.onConfigurationChanged(newConfig);
 	}
 	
 	
