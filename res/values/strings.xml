@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Geo-Tagged Audio</string>
+    <string name="upl_info">You can upload your geo-tagged audio data so that people will be able to listen to and interact with your recording on a browser. The audio file is saved to your SoundCloud account, and the geo-tag data is sent to my server. </string>
 </resources>
