@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+    
+<!--     <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Geo-Tagged Audio"
+        android:textAppearance="?android:attr/textAppearanceLarge" /> -->
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Version 1.2"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/textView3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/textView6"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PERISONiC Sound And Media"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"  android:gravity="center" >
+
+        <Button
+            android:id="@+id/btnCLose_ad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Close" android:width="100dp"/>
+
+        <Button
+            android:id="@+id/btnTwitter_ad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Follow Me" android:width="100dp"/>
+        
+    </LinearLayout>
+
+</LinearLayout>
